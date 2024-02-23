@@ -1,4 +1,5 @@
 use bevy::prelude::*;
+use bevy::time::Timer;
 
 pub struct MainPlugin;
 
@@ -18,6 +19,9 @@ struct AnimationIndices {
     last: usize,
 }
 
+#[derive(Component)]
+struct SpriteTimer(Timer);
+
 fn main() {
     App::new().add_plugins((DefaultPlugins, MainPlugin)).run();
 }
@@ -29,12 +33,13 @@ fn move_character(
         &mut Transform,
         &mut TextureAtlasSprite,
         &AnimationIndices,
+        &mut SpriteTimer,
         &Player,
     )>,
     input: Res<Input<KeyCode>>,
     time: Res<Time>,
 ) {
-    for (mut transform, mut sprite, indices, _) in &mut characters {
+    for (mut transform, mut sprite, indices, mut timer, _) in &mut characters {
         if input.pressed(KeyCode::Z) {
             transform.translation.y += 100.0 * time.delta_seconds();
         }
@@ -45,16 +50,26 @@ fn move_character(
 
         if input.pressed(KeyCode::D) {
             transform.translation.x += 100.0 * time.delta_seconds();
-            if sprite.index == indices.last {
-                sprite.index = 0;
-            } else {
-                sprite.index += 1;
+            transform.rotation = Quat::default();
+            if timer.0.tick(time.delta()).just_finished() {
+                if sprite.index == indices.last {
+                    sprite.index = 0;
+                } else {
+                    sprite.index += 1;
+                }
             }
         }
 
         if input.pressed(KeyCode::Q) {
             transform.translation.x -= 100.0 * time.delta_seconds();
-            sprite.index = 1;
+            transform.rotation = Quat::from_rotation_y(std::f32::consts::PI);
+            if timer.0.tick(time.delta()).just_finished() {
+                if sprite.index == indices.last {
+                    sprite.index = 0;
+                } else {
+                    sprite.index += 1;
+                }
+            }
         }
 
         if !input.pressed(KeyCode::Z)
@@ -80,14 +95,16 @@ fn setup(
     let texture_atlas_handle = texture_atlases.add(texture_atlas);
     let animation_indices = AnimationIndices { first: 1, last: 11 };
 
-    commands.spawn((
-        SpriteSheetBundle {
-            texture_atlas: texture_atlas_handle,
-            sprite: TextureAtlasSprite::new(0),
-            transform: Transform::from_scale(Vec3::splat(1.0)), // Set the scale of the sprite
-            ..default()
-        },
-        animation_indices,
-        Player {},
-    ));
+    commands
+        .spawn((
+            SpriteSheetBundle {
+                texture_atlas: texture_atlas_handle,
+                sprite: TextureAtlasSprite::new(0),
+                transform: Transform::from_scale(Vec3::splat(1.0)), // Set the scale of the sprite
+                ..default()
+            },
+            animation_indices,
+            Player {},
+        ))
+        .insert(SpriteTimer(Timer::from_seconds(0.05, TimerMode::Repeating)));
 }
